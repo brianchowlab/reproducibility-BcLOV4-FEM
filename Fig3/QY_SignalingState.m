@@ -1,0 +1,11 @@
+x = [0.0565,0.556,0.842,1.339,2.323,4.72,7.43]/1000;
+y = [-0.0733,13.356,20.219,25.108,32.342,41.018,39.958];
+y  = 100-y;
+y = y - min(y);
+y = y ./ max(y);
+fun = @(a,b,x) exp(-a*x*10) + b;%a is k_on_p div power
+out = fit(x',y',fun);
+excitation_frequency = 299792458 * 1e9 / 455;%1/s
+absorption_cross = 11500 * 2303 / 6.0221409e23;%cm-2
+photon_excitation_flux_density_div_power = 1/excitation_frequency / 6.626e-34;%photons cm-2 s-1
+quantum_yield_signaling_state = out.a / absorption_cross / photon_excitation_flux_density_div_power
