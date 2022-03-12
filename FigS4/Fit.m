@@ -1,64 +1,79 @@
-%% OFF FIT FINAL FOR PAPER
-%Fittable: 1,2,4,6,7,8,9,10,11,12
-figure
-i = [1,2,4,6,7,8,9,10,11,12];
-data = [];
-cis = [];
-cyto = [];
-for j = 1:size(i,2)
-    filename = ['Cell-',num2str(i(j)),'-Cyto.csv'];
-    a = readmatrix('../Analysis.xlsx','Sheet','Off');
+%Fittable: 1,2,3,4,5,6,7,10,11,12,13,14,18,19,20,22,23,25
+%Fittable 2.28.21-Data
+%1,2,3,4,5,6,7,8,10,11,12,13,14,15,16,17,18,19,23,24
+
+konv = [30000:200:40000];
+
+
+koffv = [0.03:0.001:0.04];
+
+
+%32000,0.038
+[X,Y] = meshgrid(konv,koffv);
+params = [X(:),Y(:)];
+errors = [];
+
+for k=1:size(params,1)
+    k
+    c = [1,2,3,4,5,6,7,8,10,11,12,13,15,16,17,18,19,23,24,26,28,29,30];%25
+    %c = 1;
+    %c = [1:8,10:30];
+    a = readmatrix('~/Documents/Analysis.xlsx','Sheet','2.28.21-100%');
+    %a = readmatrix('~/Documents/Analysis.xlsx','Sheet','2.28.21-SinglePulse');
+
     V = a(:,9);
     SA = a(:,10);
     frac = a(:,11);
-    frac = 0.33*ones(size(frac));
-    d = readmatrix(filename);
-    t = 0:(size(d,1)-1);
-    f = d(:,2);
-    c = (f - 104)/452.7271;
-    cyto = [cyto,c(1:200)];
-    ci = max(c);
-    cis = [cis,ci];
-    m = ci - c;
-    m = m*602.2*V(i(j))/SA(i(j))*frac(i(j));
-    t = t(1:200);
-    m = m(1:200);
-    data = [data,m];
-end
+    C = [];
+    CAll = [];
+    res = zeros(size(c,2),5001)';
+    
+    for i = 1:size(c,2)
+        %i
+        filename = ['./2.28.21-Data/Cell-',num2str(c(i)),'-Cyto-1.csv'];
 
-cyto = cyto - cyto(1,:);
-cyto = cyto ./ max(cyto(end-5:end,:));
-ci = bootci(1000,@mean,cyto')';
-temp = cyto;
-cyto = mean(cyto') - min(ci(:,1));
-temp = temp - min(ci(:,1));
-ci = ci - min(ci(:,1));
-scale = max(cyto(:,end-5:end));
-cyto = cyto ./ scale;
-ci = ci ./ scale;
-patch([t fliplr(t)], [ci(:,1)' fliplr(ci(:,2)')], 'b','FaceAlpha',0.2,'EdgeAlpha',0)
+        frac_cytoplasm = frac(c(i));
+
+        if c(i) < 16
+            d = readmatrix(filename);
+            t = 0:50;
+            a = d(1:51,2);
+            C1 = (a-104) / 452.7271;
+            filename = ['./2.28.21-Data/Cell-',num2str(c(i)),'-Cyto-2.csv'];
+            d = readmatrix(filename);
+            t = 0:50;
+            a = d(1:51,2);
+            C2 = (a-104) / 452.7271;
+            filename = ['./2.28.21-Data/Cell-',num2str(c(i)),'-Cyto-3.csv'];
+            d = readmatrix(filename);
+            t = 0:50;
+            a = d(1:51,2);
+            C0 = (max(a)-104)/452.7271*1e-6;
+            C3 = (a-104) / 452.7271;
+            CA = mean([C1,C2,C3]')';
+        else
+            d = readmatrix(filename);
+            t = 0:50;
+            a = d(1:51,2);
+            C0 = (max(a)-104)/452.7271*1e-6;
+            CA = (a-104) / 452.7271;
+        end
+        C = [C,C0];
+        CAll = [CAll,CA];
+
+
+
+        [y] = zerodim_model(params(k,1),params(k,2),20,C0,1,0.1,SA(c(i))/V(c(i))/frac(c(i))/602.2e6);
+        res(:,i) = y(:,1) + y(:,2);
+        %out = fit(t',m/median(m(40:end)),fun,'StartPoint',1,'Lower',0);
+        %kt = [kt,out.k];
+
+    end
+end
+res = res(1:100:end,:) * 1e6;
+plot(CAll)
 hold on
-plot(t,cyto,'k','LineWidth',1)
-
-fun = @(off,to,x) (1-exp(-(x-off)/to));
-off = fit(t(1:end-5)',cyto(6:end)',fun,'StartPoint',[5.5,44])
-%plot(off,t(1:end-39)',cyto(40:end)')
-plot(t,fun(5.65,off.to,t),'--r');
-ylim([0,1.05])
-set(gca,'FontSize',24)
-set(gca,'tickdir','out')
-set(gca,'linew',1.5)
-xlabel('Time (s)')
-ylabel('Scaled Fluorescence (a.u.)')
-
-c=1:size(temp,2);
-store = [];
-for i = 1:100
-    temp2 = datasample(c,max(c));
-    temp2 = mean(temp(:,temp2)')';
-    temp2 = temp2 ./ max(temp2(end-5:end,:));
-    off = fit(t(1:end-5)',temp2(6:end),fun,'StartPoint',[5.5,44]);
-    store = [store;off.to];
-end
-quantile(store,0.025)
-quantile(store,0.975)
+plot(res)
+MSE = (CAll - res).^2;
+MSE_s = sum(MSE);
+%Sort 19,20,5,23,22,9,16,1,21,15,17,10,6,4,11,8,18,12,13,7,14,2,3
